@@ -1,0 +1,172 @@
+#!/bin/sh
+
+print_err()
+{
+    echo "Usage: oled_contorl  <option>  <contorl>    ..."
+    echo "      <Option>:       <contorl>:"    
+    echo "      base_page       on/off                         Enable or disable Basic information page"    
+    echo "      wifi_2g         on/off                         Enable or disable 2Gwifi page"
+    echo "      wifi_5g         on/off                         Enable or disable 5Gwifi page"
+    echo "      lan_ip          on/off                         Enable or disable IP addresses page"
+    echo "      vpn_status      on/off                         Enable or disable VPN_status page"
+    echo "      wifi_password   on/off                         Enable or disable wifi_password page"
+    echo "      custom          on/off      <custom_info>      Display custom information"
+    echo "      version         read                           Read mcu version"
+    echo "      mcu_status      read                           Read battery information and temperature"
+}
+
+if [ "$#" -lt 1 ]; then                                                                                                         
+    print_err
+	exit 0
+fi
+
+page=$1
+contorl=$2
+if [ "$contorl" == "help" ];then
+    print_err
+    exit 0
+fi
+
+custom_info=$3
+
+base_page_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        uci set mcu.global.main_enabled='1'
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.main_enabled='0'
+    else
+        print_err
+    fi
+}
+
+wifi_2g_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        uci set mcu.global.wifi_2g_enabled='1'
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.wifi_2g_enabled='0'
+    else
+        print_err
+    fi
+}
+
+wifi_5g_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        uci set mcu.global.wifi_5g_enabled='1'
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.wifi_5g_enabled='0'
+    else
+        print_err
+    fi
+}
+
+lan_ip_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        uci set mcu.global.lan_enabled='1'
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.lan_enabled='0'
+    else
+        print_err
+    fi
+}
+
+vpn_status_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        uci set mcu.global.vpn_enabled='1'
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.vpn_enabled='0'
+    else
+        print_err
+    fi
+}
+
+wifi_password_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        uci set mcu.global.wifi_password_enabled='1'
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.wifi_password_enabled='0'
+    else
+        print_err
+    fi
+}
+
+custom_contorl()
+{
+    if [ "$contorl" == "on" ];then
+        local info="$custom_info"
+        if [ -z "$info"];then
+            print_err 
+        fi
+        uci set mcu.global.custom_enabled='1'
+        uci set mcu.global.content="$info"
+    elif [ "$contorl" == "off" ];then
+        uci set mcu.global.wifi_password_enabled='0'
+    else
+        print_err
+    fi
+}
+
+version_read()
+{
+    if [ "$contorl" == "read" ];then
+        local ver="$(ubus call mcu version | grep version | cut -d ':' -f2 | tr -d '"')"
+        echo "$ver"
+    else
+        print_err
+    fi
+}
+
+mcu_status_read()
+{
+    if [ "$contorl" == "read" ];then
+        local res="$(ubus call mcu status)"
+        local capacity="$(echo $res | awk -F "," '{print $1}' | grep charge_percent | cut -d ':' -f2 | tr -d '"')"
+        local temp="$(echo $res | awk -F "," '{print $2}' | grep temperature | cut -d ':' -f2 | tr -d '"')"
+        local chg_state="$(echo $res | awk -F "," '{print $3}' | grep charge_cnt | cut -d ':' -f2 | tr -d '"')"
+        local charge_cycle="$(echo $res | awk -F "," '{print $4}' | grep charging_status | cut -d ':' -f2 | tr -d '"')"
+        echo "Battery_capacity=$capacity,temperature=$temp,Charging_state=$chg_state,Charging_cycle=$chg_state"
+    else
+        print_err
+    fi
+}
+
+case "$page" in
+    "base_page")
+        base_page_contorl
+        ;;
+    "wifi_2g")
+        wifi_2g_contorl
+        ;;
+    "wifi_5g")
+        wifi_5g_contorl
+        ;;
+    "lan_ip")
+        lan_ip_contorl
+        ;;
+    "vpn_status")
+        vpn_status_contorl
+        ;;
+    "wifi_password")
+        wifi_password_contorl
+        ;;
+    "custom")
+        custom_contorl
+        ;;
+    "version")
+        version_read
+        ;;
+    "mcu_status")
+        mcu_status_read
+        ;;
+    *)
+        print_err
+        ;;
+esac
+
+uci commit mcu
+ubus call mcu reload
